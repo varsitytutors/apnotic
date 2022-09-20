@@ -1,3 +1,3 @@
 module Apnotic
-  VERSION = '1.4.2'.freeze
+  VERSION = '1.7.0'.freeze
 end
