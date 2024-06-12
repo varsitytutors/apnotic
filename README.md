@@ -86,7 +86,7 @@ end
 connection.push_async(push)
 
 # wait for all requests to be completed
-connection.join
+connection.join(timeout: 5)
 
 # close the connection
 connection.close
@@ -201,12 +201,19 @@ To create a new persistent connection:
 Apnotic::Connection.new(options)
 ```
 
-| Option | Description
-|-----|-----
-| :cert_path | Required. The path to a valid APNS push certificate in `.pem` or `.p12` format, or any object that responds to `:read`.
-| :cert_pass | Optional. The certificate's password.
-| :url | Optional. Defaults to https://api.push.apple.com:443.
-| :connect_timeout | Optional. Expressed in seconds, defaults to 30.
+| Option           | Description
+|------------------|------------
+| :cert_path       | `Required` The path to a valid APNS push certificate or any object that responds to `:read`. Supported formats: `.pem`, `.p12` (`:cert` auth), or `.p8` (`:token` auth).
+| :cert_pass       | `Optional` The certificate's password.
+| :auth_method     | `Optional` The options are `:cert` or `:token`. Defaults to `:cert`.
+| :team_id         | `Required for :token auth` Team ID from [Membership Details](https://developer.apple.com/account/#!/membership/).
+| :key_id          | `Required for :token auth` ID from [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/authkeys).
+| :url             | `Optional` Defaults to https://api.push.apple.com:443.
+| :connect_timeout | `Optional` Expressed in seconds, defaults to 30.
+| :proxy_addr      | `Optional` Proxy server. e.g. http://proxy.example.com
+| :proxy_port      | `Optional` Proxy port. e.g. 8080
+| :proxy_user      | `Optional` User name for proxy authentication. e.g. user_name
+| :proxy_pass      | `Optional` Password for proxy authentication. e.g. pass_word
 
 Note that since `:cert_path` can be any object that responds to `:read`, it is possible to pass in a certificate string directly by wrapping it up in a `StringIO` object:
 
@@ -220,47 +227,47 @@ It is also possible to create a connection that points to the Apple Development 
 Apnotic::Connection.development(options)
 ```
 
-> The concepts of PRODUCTION and DEVELOPMENT are different from what they used to be in previous specifications. Anything built directly from XCode and loaded on your phone will have the app generate DEVELOPMENT tokens, while everything else (TestFlight, Apple Store, HockeyApp, ...) will be considered as PRODUCTION environment.
+> The concepts of PRODUCTION and DEVELOPMENT are different from what they used to be in previous specifications. Anything built directly from Xcode and loaded on your phone will have the app generate DEVELOPMENT tokens, while everything else (TestFlight, Apple Store, HockeyApp, ...) will be considered as PRODUCTION environment.
 
 #### Methods
 
- * **cert_path** → **`string`**
+- **cert_path** → **`string`**
 
- Returns the path to the certificate.
+    Returns the path to the certificate.
 
- * **on(event, &block)**
+- **on(event, &block)**
 
-Allows to set a callback for the connection. The only available event is `:error`, which allows to set a callback when an error is raised at socket level, hence in the underlying socket thread.
+    Allows to set a callback for the connection. The only available event is `:error`, which allows to set a callback when an error is raised at socket level, hence in the underlying socket thread.
 
-```ruby
-connection.on(:error) { |exception| puts "Exception has been raised: #{exception}" }
-```
+    ```ruby
+    connection.on(:error) { |exception| puts "Exception has been raised: #{exception}" }
+    ```
 
-> If the `:error` callback is not set, the underlying socket thread may raise an error in the main thread at unexpected execution times.
+    > If the `:error` callback is not set, the underlying socket thread may raise an error in the main thread at unexpected execution times.
 
- * **url** → **`URL`**
+- **url** → **`URL`**
 
- Returns the URL of the APNS endpoint.
+    Returns the URL of the APNS endpoint.
 
 ##### Blocking calls
 
- * **push(notification, timeout: 30)** → **`Apnotic::Response` or `nil`**
+- **push(notification, timeout: 30)** → **`Apnotic::Response` or `nil`**
 
- Sends a notification. Returns `nil` in case a timeout occurs.
+    Sends a notification. Returns `nil` in case a timeout occurs.
 
 ##### Non-blocking calls
 
- * **prepare_push(notification)** → **`Apnotic::Push`**
+- **prepare_push(notification)** → **`Apnotic::Push`**
 
- Prepares an async push.
+    Prepares an async push.
 
- ```ruby
- push = client.prepare_push(notification)
- ```
+    ```ruby
+    push = client.prepare_push(notification)
+    ```
 
- * **push_async(push)**
+- **push_async(push)**
 
-  Sends the push asynchronously.
+    Sends the push asynchronously.
 
 
 ### `Apnotic::ConnectionPool`
@@ -311,6 +318,9 @@ These are all Accessor attributes.
 | `category` | "
 | `custom_payload` | "
 | `thread_id` | "
+| `target_content_id` | "
+| `interruption_level` | Refer to [Payload Key Reference](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/generating_a_remote_notification#2943363) for details. iOS 15+
+| `relevance_score` | Refer to [Payload Key Reference](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/generating_a_remote_notification#2943363) for details. iOS 15+
 | `apns_id` | Refer to [Communicating with APNs](https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html) for details.
 | `expiration` | "
 | `priority` | "
@@ -348,21 +358,21 @@ The response to a call to `connection.push`.
 
 #### Methods
 
- * **body** → **`hash` or `string`**
+-  **body** → **`hash` or `string`**
 
- Returns the body of the response in Hash format if a valid JSON was returned, otherwise just the RAW body.
+    Returns the body of the response in Hash format if a valid JSON was returned, otherwise just the RAW body.
 
-  * **headers** → **`hash`**
+- **headers** → **`hash`**
 
- Returns a Hash containing the Headers of the response.
+    Returns a Hash containing the Headers of the response.
 
- * **ok?** → **`boolean`**
+- **ok?** → **`boolean`**
 
- Returns if the push was successful.
+    Returns if the push was successful.
 
- * **status** → **`string`**
+- **status** → **`string`**
 
-Returns the status code.
+    Returns the status code.
 
 
 ### `Apnotic::Push`
@@ -370,21 +380,21 @@ The push object to be sent in an async call.
 
 #### Methods
 
- * **http2_request**  → **`NetHttp2::Request`**
+- **http2_request**  → **`NetHttp2::Request`**
 
- Returns the HTTP/2 request of the push.
+    Returns the HTTP/2 request of the push.
 
- * **on(event, &block)**
+- **on(event, &block)**
 
- Allows to set a callback for the request. Available events are:
+    Allows to set a callback for the request. Available events are:
 
-  * `:response`: triggered when a response is fully received (called once).
+    `:response`: triggered when a response is fully received (called once).
 
- Even if Apnotic is thread-safe, the async callbacks will be executed in a different thread, so ensure that your code in the callbacks is thread-safe.
+    Even if Apnotic is thread-safe, the async callbacks will be executed in a different thread, so ensure that your code in the callbacks is thread-safe.
 
- ```ruby
- push.on(:response) { |response| p response.headers }
- ```
+    ```ruby
+    push.on(:response) { |response| p response.headers }
+    ```
 
 ## Getting Your APNs Certificate
 

@@ -3,11 +3,25 @@ require 'spec_helper'
 describe Apnotic::Connection do
   let(:url) { "https://localhost" }
   let(:cert_path) { apn_file_path }
+  let(:proxy_settings) {
+    {
+      proxy_addr: "http://proxy",
+      proxy_port: "8080",
+      proxy_user: "proxy-user",
+      proxy_pass: "proxy-pass"
+    }
+  }
   let(:connection) do
     Apnotic::Connection.new({
       url:       url,
       cert_path: cert_path
     })
+  end
+  let(:connection_proxy) do
+    Apnotic::Connection.new({
+      url:       url,
+      cert_path: cert_path
+    }.merge(proxy_settings))
   end
 
   describe ".new" do
@@ -64,10 +78,23 @@ describe Apnotic::Connection do
         end
       end
     end
+
+    describe "option: proxy family" do
+      context "when proxy is set" do
+        it "has proxy-assigned NetHttp2 instance" do
+          client = connection_proxy.instance_variable_get(:@client)
+          proxy_settings.each do |k, v|
+            expect(client.instance_variable_get("@#{k}")).to eq v
+          end
+        end
+      end
+    end
   end
 
   describe ".development" do
     let(:options) { { url: "will-be-overwritten", other: "options" } }
+
+    subject { Apnotic::Connection.development(cert_path: cert_path) }
 
     it "initializes a connection object with url set to APPLE DEVELOPMENT" do
       expect(Apnotic::Connection).to receive(:new).with(options.merge({
@@ -75,6 +102,10 @@ describe Apnotic::Connection do
       }))
 
       Apnotic::Connection.development(options)
+    end
+
+    it "responds to development?" do
+      expect(subject.send(:development?)).to eq true
     end
   end
 
